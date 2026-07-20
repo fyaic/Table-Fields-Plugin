@@ -1,0 +1,531 @@
+"use strict";
+
+/*
+ * Table Fields — v0.1
+ * Goal of this spike (PRD §14): prove the #1 risk (Q2) — interactive typed cells that
+ * write back to the EXACT Markdown source range, while the table stays a plain pipe table.
+ *
+ * Approach (grounded in research, matches decisions C5/C6):
+ *   - registerMarkdownPostProcessor runs for BOTH Reading view and Live Preview's
+ *     *inactive* (rendered) tables. This is the stable path (Q3).
+ *   - ctx.getSectionInfo(el) hands back the full doc text + the table's source line range,
+ *     so we can locate and replace the exact cell on write-back.
+ *   - When the user clicks into the table in Live Preview, Obsidian natively reverts it to
+ *     source (known limitation) — controls simply aren't shown then. That is the honest,
+ *     non-surprising fallback the PRD §9 describes, not a bug.
+ *
+ * Config lives in an HTML comment directly above the table (PRD §10, Strategy A), e.g.:
+ *   <!-- table-fields id="tasks" v="1"
+ *   cols:
+ *     - {name: "Task",   type: "text"}
+ *     - {name: "Status", type: "select", options: ["Todo","Doing","Done"]}
+ *     - {name: "Due",    type: "date"}
+ *     - {name: "Amount", type: "currency", options: ["USD"]}
+ *     - {name: "Done",   type: "checkbox"}
+ *   -->
+ */
+
+const { Plugin, Notice, MarkdownView, editorLivePreviewField } = require("obsidian");
+const { StateField, RangeSetBuilder } = require("@codemirror/state");
+const { EditorView, Decoration, WidgetType } = require("@codemirror/view");
+
+/* ------------------------------ config parsing ------------------------------ */
+
+// Parse the body of a `<!-- table-fields ... -->` comment into { id, version, cols }.
+function parseConfigBlock(raw) {
+	const idMatch = raw.match(/id\s*=\s*"([^"]*)"/);
+	const vMatch = raw.match(/\bv\s*=\s*"([^"]*)"/);
+	const cols = [];
+	const colRe = /-\s*\{([^}]*)\}/g;
+	let m;
+	while ((m = colRe.exec(raw)) !== null) {
+		const body = m[1];
+		const name = (body.match(/name\s*:\s*"([^"]*)"/) || [])[1] || "";
+		const type = (body.match(/type\s*:\s*"([^"]*)"/) || [])[1] || "text";
+		let options = [];
+		const optM = body.match(/options\s*:\s*\[([^\]]*)\]/);
+		if (optM) {
+			options = optM[1]
+				.split(",")
+				.map((s) => s.trim().replace(/^"|"$/g, ""))
+				.filter((s) => s.length > 0);
+		}
+		cols.push({ name, type, options });
+	}
+	return { id: idMatch ? idMatch[1] : null, version: vMatch ? vMatch[1] : "1", cols };
+}
+
+// Given the full document text and the table's first (header) line index,
+// find the table-fields config comment immediately above it (blank lines allowed).
+function findConfigForTable(text, headerLine) {
+	const lines = text.split("\n");
+	let i = headerLine - 1;
+	// skip blank lines between the comment and the table
+	while (i >= 0 && lines[i].trim() === "") i--;
+	if (i < 0) return null;
+	// the line at i must be the closing `-->` of a comment
+	if (!/-->\s*$/.test(lines[i])) return null;
+	// walk up to the opening `<!-- table-fields`
+	let start = i;
+	while (start >= 0 && !/<!--\s*table-fields\b/.test(lines[start])) start--;
+	if (start < 0) return null;
+	const block = lines.slice(start, i + 1).join("\n");
+	const inner = block.replace(/^[\s\S]*?table-fields\b/, "").replace(/-->\s*$/, "");
+	return parseConfigBlock(inner);
+}
+
+/* ------------------------------ cell utilities ------------------------------ */
+
+const CHECKBOX_RE = /^\[[ xX]\]$/;
+
+function isChecked(raw) {
+	return /^\[[xX]\]$/.test(raw.trim());
+}
+
+// Split a Markdown table row into { parts, cellOffset } so cell index -> parts index.
+function splitRow(line) {
+	const parts = line.split("|");
+	// leading pipe => parts[0] is empty/whitespace; cells begin at index 1
+	const leading = parts.length > 0 && parts[0].trim() === "";
+	return { parts, cellOffset: leading ? 1 : 0 };
+}
+
+function formatCurrency(raw, code) {
+	const n = Number(String(raw).replace(/[, ]/g, ""));
+	if (!isFinite(n)) return null;
+	try {
+		return new Intl.NumberFormat(undefined, {
+			style: "currency",
+			currency: code || "USD",
+		}).format(n);
+	} catch (e) {
+		return (code || "$") + " " + n.toFixed(2);
+	}
+}
+
+function formatDate(raw) {
+	const v = raw.trim();
+	if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return null;
+	const d = new Date(v + "T00:00:00");
+	if (isNaN(d.getTime())) return null;
+	return d.toLocaleDateString();
+}
+
+/* ------------------------------ the plugin ------------------------------ */
+
+module.exports = class MarkdownSmartTablesPlugin extends Plugin {
+	async onload() {
+		// Reading view + inactive Live Preview content: markdown post-processor.
+		this.registerMarkdownPostProcessor((el, ctx) => this.enhanceTables(el, ctx));
+
+		// Live Preview (the native CM6-rendered table): a CodeMirror 6 editor extension
+		// that replaces the table's source lines with our own interactive table widget.
+		this.registerEditorExtension(smartTableField);
+
+		this.addCommand({
+			id: "mark-as-table-fields",
+			name: "Mark table under cursor as Table Fields",
+			editorCallback: (editor) => this.markTableAsSmart(editor),
+		});
+
+		console.log("[table-fields] loaded (v0.1 spike)");
+	}
+
+	onunload() {
+		console.log("[table-fields] unloaded");
+	}
+
+	/* --- rendering path (Reading view + inactive Live Preview tables) --- */
+
+	enhanceTables(el, ctx) {
+		try {
+			const tables = el.findAll ? el.findAll("table") : Array.from(el.querySelectorAll("table"));
+			if (tables.length === 0) return;
+			console.log("[tf] enhanceTables: found", tables.length, "table(s) in section");
+			for (const table of tables) {
+				const info = ctx.getSectionInfo(el);
+				if (!info) {
+					console.log("[tf]  -> getSectionInfo returned NULL (cannot locate source lines)");
+					continue;
+				}
+				const config = findConfigForTable(info.text, info.lineStart);
+				console.log(
+					"[tf]  -> lineStart=", info.lineStart,
+					"| headerLine=", JSON.stringify((info.text.split("\n")[info.lineStart] || "").slice(0, 40)),
+					"| config cols=", config ? config.cols.length : "none"
+				);
+				if (!config || config.cols.length === 0) continue; // plain table -> untouched
+
+				table.classList.add("tf-table");
+				const rows = Array.from(table.querySelectorAll("tbody tr"));
+				console.log("[tf]  -> enhancing", rows.length, "row(s),", config.cols.length, "col(s)");
+				rows.forEach((tr, rowIndex) => {
+					const cells = Array.from(tr.children).filter((c) => c.tagName === "TD");
+					cells.forEach((td, colIndex) => {
+						const col = config.cols[colIndex];
+						if (!col) return;
+						this.enhanceCell(td, col, rowIndex, colIndex, el, ctx);
+					});
+				});
+			}
+		} catch (e) {
+			console.error("[tf] enhanceTables error:", e);
+		}
+	}
+
+	enhanceCell(td, col, rowIndex, colIndex, el, ctx) {
+		const raw = (td.textContent || "").trim();
+		switch (col.type) {
+			case "checkbox": {
+				if (!CHECKBOX_RE.test(raw)) return;
+				const input = td.createEl("input", { type: "checkbox" });
+				input.checked = isChecked(raw);
+				input.classList.add("tf-checkbox");
+				td.textContent = "";
+				td.appendChild(input);
+				td.classList.add("tf-cell-center");
+				this.registerDomEvent(input, "change", () => {
+					this.writeBackCell(el, ctx, rowIndex, colIndex, input.checked ? "[x]" : "[ ]");
+				});
+				break;
+			}
+			case "select": {
+				const select = document.createElement("select");
+				select.classList.add("tf-select");
+				const opts = col.options && col.options.length ? col.options : [raw];
+				if (!opts.includes(raw)) opts.unshift(raw); // keep current value selectable
+				for (const o of opts) {
+					const opt = select.createEl("option", { text: o });
+					if (o === raw) opt.selected = true;
+				}
+				td.textContent = "";
+				td.appendChild(select);
+				this.registerDomEvent(select, "change", () => {
+					this.writeBackCell(el, ctx, rowIndex, colIndex, select.value);
+				});
+				break;
+			}
+			case "currency": {
+				const formatted = formatCurrency(raw, col.options && col.options[0]);
+				if (formatted != null) td.textContent = formatted;
+				td.classList.add("tf-cell-right");
+				break;
+			}
+			case "percentage": {
+				td.classList.add("tf-cell-right");
+				break;
+			}
+			case "date": {
+				const formatted = formatDate(raw);
+				if (formatted != null) {
+					td.textContent = formatted;
+					td.setAttr("title", raw); // keep ISO discoverable on hover
+				}
+				td.classList.add("tf-cell-date");
+				break;
+			}
+			default:
+				break; // text: leave as-is
+		}
+	}
+
+	/* --- write-back: replace the exact cell in the Markdown source (Q2) --- */
+
+	writeBackCell(el, ctx, rowIndex, colIndex, newValue) {
+		const info = ctx.getSectionInfo(el); // fresh lookup — line numbers may have drifted
+		if (!info) {
+			new Notice("Table Fields: could not locate table source.");
+			return;
+		}
+		// header = lineStart, delimiter = lineStart+1, data rows start at lineStart+2
+		const dataLine = info.lineStart + 2 + rowIndex;
+
+		const apply = (lineText) => {
+			const { parts, cellOffset } = splitRow(lineText);
+			const idx = cellOffset + colIndex;
+			if (idx < 0 || idx >= parts.length) return null;
+			parts[idx] = " " + newValue + " ";
+			return parts.join("|");
+		};
+
+		const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+		if (view && view.file && view.file.path === ctx.sourcePath && view.editor) {
+			const editor = view.editor;
+			if (dataLine >= editor.lineCount()) return;
+			const cur = editor.getLine(dataLine);
+			const next = apply(cur);
+			if (next != null && next !== cur) editor.setLine(dataLine, next);
+			return;
+		}
+
+		// fallback: no matching active editor — patch the file on disk safely
+		const file = this.app.vault.getAbstractFileByPath(ctx.sourcePath);
+		if (!file) return;
+		this.app.vault.process(file, (data) => {
+			const lines = data.split("\n");
+			if (dataLine >= lines.length) return data;
+			const next = apply(lines[dataLine]);
+			if (next != null) lines[dataLine] = next;
+			return lines.join("\n");
+		});
+	}
+
+	/* --- command: mark the table under the cursor as a smart table --- */
+
+	markTableAsSmart(editor) {
+		const cursor = editor.getCursor();
+		let top = cursor.line;
+		let bottom = cursor.line;
+		const isTableRow = (n) =>
+			n >= 0 && n < editor.lineCount() && editor.getLine(n).includes("|");
+
+		if (!isTableRow(cursor.line)) {
+			new Notice("Table Fields: place the cursor inside a Markdown table.");
+			return;
+		}
+		while (isTableRow(top - 1)) top--;
+		while (isTableRow(bottom + 1)) bottom++;
+
+		// bail if a config comment already sits directly above
+		let above = top - 1;
+		while (above >= 0 && editor.getLine(above).trim() === "") above--;
+		if (above >= 0 && /-->\s*$/.test(editor.getLine(above))) {
+			new Notice("Table Fields: this table already has a config comment.");
+			return;
+		}
+
+		const headerCells = splitRowCells(editor.getLine(top));
+		const sampleLine = top + 2 <= bottom ? editor.getLine(top + 2) : null;
+		const sampleCells = sampleLine ? splitRowCells(sampleLine) : [];
+
+		const cols = headerCells.map((name, i) => {
+			const sample = (sampleCells[i] || "").trim();
+			return `  - {name: "${name}", type: "${inferType(sample)}"}`;
+		});
+
+		const id = (headerCells[0] || "table").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "table";
+		const comment =
+			`<!-- table-fields id="${id}" v="1"\n` +
+			`cols:\n` +
+			cols.join("\n") +
+			`\n-->\n`;
+
+		editor.replaceRange(comment, { line: top, ch: 0 });
+		new Notice(`Table Fields: marked "${id}" (${headerCells.length} columns). Edit the comment to set column types.`);
+	}
+};
+
+/* ------------------------------ helpers for the command ------------------------------ */
+
+function splitRowCells(line) {
+	const { parts, cellOffset } = splitRow(line);
+	const cells = parts.slice(cellOffset);
+	// drop trailing empty from a trailing pipe
+	if (cells.length && cells[cells.length - 1].trim() === "") cells.pop();
+	return cells.map((c) => c.trim());
+}
+
+function inferType(sample) {
+	if (CHECKBOX_RE.test(sample)) return "checkbox";
+	if (/^\d{4}-\d{2}-\d{2}$/.test(sample)) return "date";
+	if (/^\d+(\.\d+)?%$/.test(sample)) return "percentage";
+	if (/^\d+(\.\d+)?$/.test(sample)) return "currency";
+	return "text";
+}
+
+/* ============================================================================
+ * Live Preview path — CodeMirror 6 editor extension.
+ * Replaces each smart table's source lines with an interactive table widget,
+ * unless the cursor is inside the table (then show source for editing).
+ * Only active in Live Preview (editorLivePreviewField); Source mode stays raw.
+ * ==========================================================================*/
+
+// Scan the whole document for smart tables. Returns, per table, the config plus
+// the 0-based line indices of the comment start, header, and last data row.
+function findSmartTables(text) {
+	const lines = text.split("\n");
+	const out = [];
+	for (let i = 0; i < lines.length; i++) {
+		if (!/<!--\s*table-fields\b/.test(lines[i])) continue;
+		let j = i;
+		while (j < lines.length && !/-->/.test(lines[j])) j++;
+		if (j >= lines.length) continue; // unterminated comment
+		let k = j + 1;
+		while (k < lines.length && lines[k].trim() === "") k++;
+		if (k >= lines.length || !lines[k].includes("|")) continue; // no table below
+		const headerLine = k;
+		let m = k;
+		while (m + 1 < lines.length && lines[m + 1].trim() !== "" && lines[m + 1].includes("|")) m++;
+		const block = lines.slice(i, j + 1).join("\n");
+		const inner = block.replace(/^[\s\S]*?table-fields\b/, "").replace(/-->[\s\S]*$/, "");
+		const config = parseConfigBlock(inner);
+		if (config.cols.length > 0) {
+			out.push({ configStartLine: i, headerLine, lastRowLine: m, config });
+		}
+		i = m; // continue scanning after this table
+	}
+	return out;
+}
+
+// Split a table row into cell segments with absolute doc offsets (between pipes).
+function getCellRanges(lineText, lineFrom) {
+	const pipes = [];
+	for (let i = 0; i < lineText.length; i++) if (lineText[i] === "|") pipes.push(i);
+	const cells = [];
+	for (let k = 0; k < pipes.length - 1; k++) {
+		const innerFrom = pipes[k] + 1;
+		const innerTo = pipes[k + 1];
+		cells.push({ text: lineText.slice(innerFrom, innerTo), from: lineFrom + innerFrom, to: lineFrom + innerTo });
+	}
+	return cells;
+}
+
+// Replace one cell's source range via a CM6 transaction (the write-back, Q2).
+function dispatchCell(view, cell, newValue) {
+	view.dispatch({ changes: { from: cell.from, to: cell.to, insert: " " + newValue + " " } });
+}
+
+// Render a single interactive/formatted cell into `td` for the Live Preview widget.
+function renderWidgetCell(td, col, cell, view) {
+	const raw = (cell.text || "").trim();
+	switch (col.type) {
+		case "checkbox": {
+			if (!CHECKBOX_RE.test(raw)) { td.textContent = raw; return; }
+			const input = td.createEl("input", { type: "checkbox" });
+			input.checked = isChecked(raw);
+			input.classList.add("tf-checkbox");
+			td.classList.add("tf-cell-center");
+			input.addEventListener("change", () => dispatchCell(view, cell, input.checked ? "[x]" : "[ ]"));
+			break;
+		}
+		case "select": {
+			const select = document.createElement("select");
+			select.classList.add("tf-select");
+			const opts = col.options && col.options.length ? col.options.slice() : [raw];
+			if (!opts.includes(raw)) opts.unshift(raw);
+			for (const o of opts) {
+				const opt = select.createEl("option", { text: o });
+				if (o === raw) opt.selected = true;
+			}
+			td.appendChild(select);
+			select.addEventListener("change", () => dispatchCell(view, cell, select.value));
+			break;
+		}
+		case "currency": {
+			const f = formatCurrency(raw, col.options && col.options[0]);
+			td.textContent = f != null ? f : raw;
+			td.classList.add("tf-cell-right");
+			break;
+		}
+		case "percentage": {
+			td.textContent = raw;
+			td.classList.add("tf-cell-right");
+			break;
+		}
+		case "date": {
+			const f = formatDate(raw);
+			td.textContent = f != null ? f : raw;
+			if (f != null) td.setAttr("title", raw);
+			td.classList.add("tf-cell-date");
+			break;
+		}
+		default:
+			td.textContent = raw;
+	}
+}
+
+// The block widget that renders a whole smart table interactively in Live Preview.
+class SmartTableWidget extends WidgetType {
+	constructor(data) {
+		super();
+		this.data = data;
+	}
+	eq(other) {
+		return other && other.data && other.data.signature === this.data.signature;
+	}
+	toDOM(view) {
+		const wrap = document.createElement("div");
+		wrap.className = "tf-lp-wrap";
+		const table = document.createElement("table");
+		table.className = "tf-table tf-lp-table";
+
+		const thead = document.createElement("thead");
+		const htr = document.createElement("tr");
+		for (const col of this.data.config.cols) {
+			const th = document.createElement("th");
+			th.textContent = col.name;
+			htr.appendChild(th);
+		}
+		thead.appendChild(htr);
+		table.appendChild(thead);
+
+		const tbody = document.createElement("tbody");
+		for (const row of this.data.rows) {
+			const tr = document.createElement("tr");
+			row.cells.forEach((cell, colIndex) => {
+				const col = this.data.config.cols[colIndex];
+				const td = document.createElement("td");
+				if (col) renderWidgetCell(td, col, cell, view);
+				else td.textContent = (cell.text || "").trim();
+				tr.appendChild(td);
+			});
+			tbody.appendChild(tr);
+		}
+		table.appendChild(tbody);
+		wrap.appendChild(table);
+		return wrap;
+	}
+	// Let our controls handle their own events instead of the editor.
+	ignoreEvent() {
+		return true;
+	}
+}
+
+// Build the decoration set for the current editor state.
+function buildSmartTableDecorations(state) {
+	try {
+		if (!state.field(editorLivePreviewField, false)) return Decoration.none; // Source mode -> raw
+		const text = state.doc.toString();
+		const tables = findSmartTables(text);
+		if (!tables.length) return Decoration.none;
+		const sel = state.selection.main;
+		const builder = new RangeSetBuilder();
+		for (const t of tables) {
+			const fromLine = state.doc.line(t.configStartLine + 1);
+			const toLine = state.doc.line(t.lastRowLine + 1);
+			const from = fromLine.from;
+			const to = toLine.to;
+			if (sel.to >= from && sel.from <= to) continue; // cursor inside -> show source
+
+			const rows = [];
+			const sigParts = [];
+			for (let ln = t.headerLine + 2; ln <= t.lastRowLine; ln++) {
+				const line = state.doc.line(ln + 1);
+				const cells = getCellRanges(line.text, line.from);
+				rows.push({ cells });
+				sigParts.push(cells.map((c) => c.text).join("|"));
+			}
+			const signature =
+				from + ":" + to + ":" + t.config.cols.map((c) => c.type + "/" + (c.options || []).join(".")).join(",") + ":" + sigParts.join("//");
+			const widget = new SmartTableWidget({ config: t.config, rows, signature });
+			builder.add(from, to, Decoration.replace({ widget, block: true }));
+		}
+		return builder.finish();
+	} catch (e) {
+		console.error("[tf] LP buildDecorations error:", e);
+		return Decoration.none;
+	}
+}
+
+const smartTableField = StateField.define({
+	create(state) {
+		return buildSmartTableDecorations(state);
+	},
+	update(deco, tr) {
+		if (!tr.docChanged && !tr.selection) return deco;
+		return buildSmartTableDecorations(tr.state);
+	},
+	provide(f) {
+		return EditorView.decorations.from(f);
+	},
+});

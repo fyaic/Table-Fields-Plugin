@@ -1,0 +1,9 @@
+{
+	"id": "table-fields",
+	"name": "Table Fields",
+	"version": "0.1.0",
+	"minAppVersion": "1.1.0",
+	"description": "Give Markdown table columns a type — checkbox, select, date, currency, percentage — with inline controls in Live Preview and Reading view. Stays a plain pipe table on disk.",
+	"author": "Table Fields",
+	"isDesktopOnly": false
+}
