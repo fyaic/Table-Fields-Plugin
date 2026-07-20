@@ -1,11 +1,29 @@
 # Table Fields
 
-**Give your Markdown table columns a type** — checkbox, select, date, currency, percentage — with
-inline controls (clickable checkboxes, dropdowns) and clean formatting, in **both Live Preview and
-Reading view**.
+> Your Markdown tables, but you can actually **click** them — tick checkboxes, pick from
+> dropdowns, and see dates and money formatted nicely — all inside your note.
 
-The whole point: your table stays a **plain Markdown pipe table on disk**. Turn the plugin off and
-you're left with an ordinary, readable table — no JSON blob, no database, no note-per-row.
+**English** · [中文](README.zh-CN.md) — [Engineering ›](ENGINEERING.md)
+
+Table Fields gives each **column a meaning**. Tell it "this column is a checkbox", "this one is a
+status dropdown", "this one is money" — and your plain table turns into something you can operate
+like a tiny spreadsheet. And here's the promise: **underneath, it's still just a normal Markdown
+table.** Turn the plugin off and your note is exactly as readable as before. No database, no hidden
+file, no lock-in.
+
+## What it does
+
+- ☑️ **Checkboxes you can tick** — click to mark something done, right in the table.
+- 🔽 **Dropdowns** — pick a status or category from a fixed list, so values never drift.
+- 💲 **Money, %, and dates that look right** — amounts line up with a currency symbol, dates read in
+  your local format, percentages align neatly.
+- 🖱️ **Right-click a column to set what it is** — no settings screen to hunt through.
+- 👀 **Works while you read *and* while you edit** — the controls show up in both modes.
+- 🧹 **Nothing locked in** — it's always a plain Markdown table on disk.
+
+## See it
+
+You write (or generate) a small note like this:
 
 ```markdown
 <!-- table-fields id="tasks" v="1"
@@ -21,107 +39,55 @@ cols:
 | Review designs | Todo   | 2026-07-24 | [ ]  |
 ```
 
-With the little comment on top, `Status` becomes a dropdown, `Due` is formatted, and `Done` is a
-real checkbox you can click — while the source on disk stays exactly the plain table above.
+…and in your note it becomes a table where **Status** is a dropdown, **Due** shows a tidy date, and
+**Done** is a real checkbox you can click. Tick it, and the change is saved straight into the table.
 
-## Features
+## Why it's different
 
-- ✅ **Typed columns**: text, checkbox, select, date, currency, percentage.
-- ✅ **Interactive in Live Preview *and* Reading view**: toggle checkboxes, pick from dropdowns.
-- ✅ **Writes back to the exact Markdown cell** — your file stays the source of truth.
-- ✅ **Right-click a column header** to set its type (spreadsheet-style; rewrites the config for you).
-- ✅ **Auto-detect** column types from existing data via a command.
-- ✅ **Clean fallback**: disable the plugin and it's just a normal Markdown table again.
-
-## Why not Bases or a spreadsheet plugin?
-
-- **Obsidian Bases** turns rows into notes — a database. Great when your data wants to be many
-  notes; overkill when you just want a little structure in one table in one note.
-- **Rich table plugins** usually store the table as a fenced JSON code block, so you lose the plain
-  Markdown table.
-- **Table Fields** sits in the middle: richer than a plain table, but still *just a pipe table*.
+- **It's not a database.** Tools like Obsidian Bases turn every row into a separate note. Table
+  Fields keeps everything in *one table in one note*.
+- **It's not a separate spreadsheet.** Other table tools store your data as a block of code you can
+  no longer read. Table Fields never does that — it stays a plain table.
+- **Disable it anytime.** Your note is still a clean, readable Markdown table. You never lose your
+  data or your ability to read it in any other app.
 
 ## Quick start
 
-1. Have a normal Markdown table.
-2. Put your cursor in it and run **"Table Fields: Mark table under cursor as Table Fields"**
-   (`Ctrl`/`Cmd`-`P`). It inserts a config comment with column types inferred from your data.
-3. Fine-tune: in Live Preview, **right-click any column header** to change its type. Or edit the
-   `<!-- table-fields ... -->` comment by hand.
+1. Write a normal Markdown table.
+2. Put your cursor in it and run the command **"Table Fields: Mark table under cursor as Table
+   Fields"** — it looks at your data and sets up the columns for you.
+3. Want to change a column? **Right-click its header** and pick the type (text, checkbox, dropdown,
+   date, money, or percent).
 
-Tables **without** a `table-fields` comment are left completely untouched.
+That's it. Click your checkboxes and dropdowns; everything saves back into the note automatically.
 
-### The config comment
+## Features, one by one
 
-```markdown
-<!-- table-fields id="budget" v="1"
-cols:
-  - {name: "Item",     type: "text"}
-  - {name: "Category", type: "select", options: ["Housing","Food","Utility"]}
-  - {name: "Amount",   type: "currency", options: ["USD"]}
-  - {name: "Paid",     type: "checkbox"}
--->
-```
+- **Checkbox columns** — turn a column of `done / not done` into clickable boxes.
+- **Dropdown (select) columns** — give a column a fixed set of choices (like *Todo / Doing / Done*)
+  so everyone uses the same words.
+- **Money columns** — type a plain number; it's shown with a currency symbol and lined up on the
+  right.
+- **Percent columns** — kept as simple `60%` text, aligned for easy scanning.
+- **Date columns** — stored in a standard form, shown in your local date style.
+- **Right-click setup** — change any column's type from the table itself, no config screen needed.
 
-- `id` — identifies the table (so multiple tables per note don't collide).
-- `v` — config version (used for future migrations).
-- each column: `name`, `type`, and optional `options` (dropdown values, or a currency code).
+## Good to know
 
-## Column types
+- Your values stay as **plain, readable text** — dates as `2026-07-22`, money as `1200.00`. The
+  pretty formatting is only on screen.
+- There are **no formulas** — this is on purpose. Table Fields is for light structure, not for
+  turning your note into Excel.
+- **Coming next:** right-click to add or remove rows and columns, edit dropdown choices, and sort.
 
-| Type | Stored in the cell | Shown as |
-| --- | --- | --- |
-| `text` | plain text | text |
-| `checkbox` | `[x]` / `[ ]` | a clickable checkbox |
-| `select` | the chosen option's text | a dropdown (options from config) |
-| `date` | ISO `YYYY-MM-DD` | locale-formatted (ISO on hover) |
-| `currency` | a plain number, e.g. `1200.00` | right-aligned currency (symbol from `options: ["USD"]`) |
-| `percentage` | a `NN%` literal, e.g. `60%` | right-aligned |
+## Install (for now)
 
-Values are stored in a **clean, human-readable form**; formatting is display-only. Editing a control
-writes the value back to the exact cell in the Markdown source. There are **no formulas** — values
-are literals, by design.
-
-## Behavior by view
-
-| View | Behavior |
-| --- | --- |
-| **Live Preview** | Interactive controls when the cursor is outside the table. Click *into* the table and it becomes normal editable source (by design). |
-| **Reading view** | Interactive controls + formatting. |
-| **Source mode** | Untouched raw Markdown. |
-
-## Install (manual)
-
-Not in the community catalog yet. To use it:
+Table Fields isn't in the community store yet. To try it:
 
 1. Copy this folder into `<your vault>/.obsidian/plugins/table-fields/`.
-2. Obsidian → Settings → Community plugins → enable **Table Fields**.
-3. Reload if needed (`Ctrl`/`Cmd`-`P` → "Reload app without saving").
+2. In Obsidian: **Settings → Community plugins → enable Table Fields**.
+3. Open a note with a `table-fields` table (there's an example note in this repo's history).
 
-Ships as plain JS — no build step. Files: `manifest.json`, `main.js`, `styles.css`, `versions.json`.
+---
 
-A ready-made `TableFields-Demo.md` (with budget / habit / project tables) is included in this repo's
-history for trying things out.
-
-## Roadmap
-
-More spreadsheet-style right-click actions — all just text transforms on the Markdown source:
-
-- Insert / delete / duplicate rows.
-- Insert / delete / rename / reorder columns.
-- Edit `select` options and currency code from the menu.
-- Sort by column.
-- Optional column-width auto-alignment on write-back.
-
-Deliberately **not** planned: charts, pivots, a formula engine, cross-table references, or a
-database/note-per-row model. Table Fields stays lightweight and Markdown-first.
-
-## How it works (for developers)
-
-- **Reading view** uses `registerMarkdownPostProcessor`.
-- **Live Preview** uses a CodeMirror 6 `StateField` that replaces the table's source lines with an
-  interactive widget, and yields back to source when the cursor is inside. Source mode is detected
-  via Obsidian's `editorLivePreviewField`.
-- Edits are applied as minimal CM6 transactions over the exact cell / config source range.
-- No bundler required: `require("obsidian")` and `require("@codemirror/*")` resolve to Obsidian's
-  bundled copies at runtime.
+Curious how it works under the hood? See the **[Engineering README ›](ENGINEERING.md)**.
