@@ -25,7 +25,7 @@
  *   -->
  */
 
-const { Plugin, Notice, MarkdownView, editorLivePreviewField } = require("obsidian");
+const { Plugin, Notice, MarkdownView, Menu, editorLivePreviewField } = require("obsidian");
 const { StateField, RangeSetBuilder } = require("@codemirror/state");
 const { EditorView, Decoration, WidgetType } = require("@codemirror/view");
 
@@ -360,11 +360,26 @@ function findSmartTables(text) {
 		const inner = block.replace(/^[\s\S]*?table-fields\b/, "").replace(/-->[\s\S]*$/, "");
 		const config = parseConfigBlock(inner);
 		if (config.cols.length > 0) {
-			out.push({ configStartLine: i, headerLine, lastRowLine: m, config });
+			out.push({ configStartLine: i, commentEndLine: j, headerLine, lastRowLine: m, config });
 		}
 		i = m; // continue scanning after this table
 	}
 	return out;
+}
+
+// Serialize a config object back into a `<!-- table-fields ... -->` comment block.
+function serializeConfig(config) {
+	const lines = config.cols.map((c) => {
+		let s = `  - {name: "${c.name}", type: "${c.type}"`;
+		if (c.options && c.options.length) s += `, options: [${c.options.map((o) => `"${o}"`).join(",")}]`;
+		return s + "}";
+	});
+	return (
+		`<!-- table-fields id="${config.id || "table"}" v="${config.version || "1"}"\n` +
+		`cols:\n` +
+		lines.join("\n") +
+		`\n-->`
+	);
 }
 
 // Split a table row into cell segments with absolute doc offsets (between pipes).
@@ -451,11 +466,17 @@ class SmartTableWidget extends WidgetType {
 
 		const thead = document.createElement("thead");
 		const htr = document.createElement("tr");
-		for (const col of this.data.config.cols) {
+		this.data.config.cols.forEach((col, colIndex) => {
 			const th = document.createElement("th");
 			th.textContent = col.name;
+			th.classList.add("tf-th");
+			th.setAttr("title", "Right-click to set column type");
+			th.addEventListener("contextmenu", (evt) => {
+				evt.preventDefault();
+				this.showColumnMenu(view, colIndex, col, evt);
+			});
 			htr.appendChild(th);
-		}
+		});
 		thead.appendChild(htr);
 		table.appendChild(thead);
 
@@ -475,6 +496,31 @@ class SmartTableWidget extends WidgetType {
 		wrap.appendChild(table);
 		return wrap;
 	}
+	// Right-click a header -> pick the column's type (rewrites the config comment).
+	showColumnMenu(view, colIndex, col, evt) {
+		const menu = new Menu();
+		menu.addItem((i) => i.setTitle("Column: " + col.name).setDisabled(true));
+		menu.addSeparator();
+		const types = ["text", "checkbox", "select", "date", "currency", "percentage"];
+		for (const ty of types) {
+			menu.addItem((item) => {
+				item
+					.setTitle(ty)
+					.setChecked(col.type === ty)
+					.onClick(() => {
+						const cols = this.data.config.cols.map((c, i) =>
+							i === colIndex ? Object.assign({}, c, { type: ty }) : c
+						);
+						const cfg = { id: this.data.config.id, version: this.data.config.version, cols };
+						view.dispatch({
+							changes: { from: this.data.configRange.from, to: this.data.configRange.to, insert: serializeConfig(cfg) },
+						});
+					});
+			});
+		}
+		menu.showAtMouseEvent(evt);
+	}
+
 	// Let our controls handle their own events instead of the editor.
 	ignoreEvent() {
 		return true;
@@ -507,7 +553,11 @@ function buildSmartTableDecorations(state) {
 			}
 			const signature =
 				from + ":" + to + ":" + t.config.cols.map((c) => c.type + "/" + (c.options || []).join(".")).join(",") + ":" + sigParts.join("//");
-			const widget = new SmartTableWidget({ config: t.config, rows, signature });
+			const configRange = {
+				from: state.doc.line(t.configStartLine + 1).from,
+				to: state.doc.line(t.commentEndLine + 1).to,
+			};
+			const widget = new SmartTableWidget({ config: t.config, rows, signature, configRange });
 			builder.add(from, to, Decoration.replace({ widget, block: true }));
 		}
 		return builder.finish();

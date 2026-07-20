@@ -46,6 +46,10 @@ cols:
 Or let the plugin write it for you: put the cursor in a table and run the command
 **"Table Fields: Mark table under cursor as Table Fields"** — it infers column types from the data.
 
+**Spreadsheet-style editing:** in Live Preview, **right-click a column header** to set that
+column's type — the config comment is rewritten for you, no sidebar needed. (More right-click
+actions — insert/delete rows and columns, edit select options — are on the roadmap.)
+
 Tables **without** this comment are left completely untouched.
 
 ## Column types
@@ -85,8 +89,8 @@ Files: `manifest.json`, `main.js` (plain JS, no build step), `styles.css`.
 This is an early, working version focused on proving the core loop (typed cells ↔ Markdown
 write-back). Known limitations:
 
-- **No configuration sidebar yet** — set column types by editing the comment or via the mark
-  command.
+- **Set column types** by right-clicking a header (Live Preview), editing the comment, or the
+  mark command. A full sidebar isn't planned — right-click is the spreadsheet-style path.
 - **Column widths aren't re-aligned** on write-back (cells are written as ` value `).
 - **No formulas** (e.g. auto-computed percentages) — by design; values are literals.
 - Currency/percentage/date cells format for display but are not yet inline-editable controls

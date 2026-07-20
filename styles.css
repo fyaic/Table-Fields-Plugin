@@ -62,3 +62,7 @@
 	font-weight: var(--font-semibold);
 	text-align: left;
 }
+
+.tf-lp-table th.tf-th {
+	cursor: context-menu;
+}
