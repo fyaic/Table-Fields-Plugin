@@ -48,10 +48,10 @@ cols:
 
 ## Dropdown choices are edited in Source mode
 
-Switch the note to **Source mode**, find the `type: "select"` column, and edit its `options: [...]`
-list. When you switch back to Reading view or Live Preview, the dropdown uses that list. Tip: if the
-new choices do not appear immediately, leave the note and open it again to refresh the rendered
-dropdown.
+Switch the note to **Source mode**, find the `type: "select"` column, and edit its `options` list —
+for example `options: ["Low","Medium","High"]`. When you switch back to Reading view or Live Preview,
+the dropdown uses that list. Tip: if the new choices do not appear immediately, leave the note and
+open it again to refresh the rendered dropdown.
 
 ![Edit dropdown choices in Source mode by changing the select column's options list.](assets/readme/05-edit-dropdown-options.png)
 

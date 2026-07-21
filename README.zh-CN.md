@@ -45,9 +45,9 @@ cols:
 
 ## 下拉选项在 Source mode 里直接改
 
-切到 **Source mode**，找到 `type: "select"` 的那一列，编辑它的 `options: [...]` 列表。改完切回阅读视图或
-Live Preview，下拉列表就会使用这些选项。小提示：如果新选项没有立刻出现，退出这篇 note 再重新打开一次，
-让渲染刷新。
+切到 **Source mode**，找到 `type: "select"` 的那一列，编辑它的 `options` 列表——例如
+`options: ["Low","Medium","High"]`。改完切回阅读视图或 Live Preview，下拉列表就会使用这些选项。
+小提示：如果新选项没有立刻出现，退出这篇 note 再重新打开一次，让渲染刷新。
 
 ![在 Source mode 里修改 select 列的 options 列表即可编辑下拉选项。](assets/readme/05-edit-dropdown-options.png)
 
