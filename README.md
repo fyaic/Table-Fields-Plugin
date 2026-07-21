@@ -11,6 +11,8 @@ like a tiny spreadsheet. And here's the promise: **underneath, it's still just a
 table.** Turn the plugin off and your note is exactly as readable as before. No database, no hidden
 file, no lock-in.
 
+![Table Fields turns plain Markdown tables into interactive controls inside Obsidian.](assets/readme/01-table-fields-overview.png)
+
 ## What it does
 
 - ☑️ **Checkboxes you can tick** — click to mark something done, right in the table.
@@ -41,6 +43,8 @@ cols:
 
 …and in your note it becomes a table where **Status** is a dropdown, **Due** shows a tidy date, and
 **Done** is a real checkbox you can click. Tick it, and the change is saved straight into the table.
+
+![Right-click a column header to choose its Table Fields type.](assets/readme/02-column-type-menu.png)
 
 ## Why it's different
 

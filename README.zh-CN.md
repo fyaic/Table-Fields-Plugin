@@ -9,6 +9,8 @@ Table Fields 给每一**列一个含义**。告诉它"这列是复选框""这列
 就变成了一个能像小型电子表格一样操作的东西。而关键承诺是：**底层它依然只是一张普通的 Markdown 表格**。
 关掉插件，你的笔记和原来一样清爽可读。没有数据库、没有隐藏文件、不绑架你的数据。
 
+![Table Fields 在 Obsidian 里把普通 Markdown 表格变成可操作控件。](assets/readme/01-table-fields-overview.png)
+
 ## 它能做什么
 
 - ☑️ **能点的复选框**——直接在表格里点一下标记完成。
@@ -38,6 +40,8 @@ cols:
 
 ……在笔记里它就变成一张表：**Status** 是下拉，**Due** 显示成整洁的日期，**Done** 是一个能点的真复选框。
 点一下，改动就直接存回表格里。
+
+![右键列头即可选择这一列的 Table Fields 类型。](assets/readme/02-column-type-menu.png)
 
 ## 它和别的有什么不同
 
