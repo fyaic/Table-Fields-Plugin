@@ -9,7 +9,7 @@ Table Fields 给每一**列一个含义**。告诉它"这列是复选框""这列
 就变成了一个能像小型电子表格一样操作的东西。而关键承诺是：**底层它依然只是一张普通的 Markdown 表格**。
 关掉插件，你的笔记和原来一样清爽可读。没有数据库、没有隐藏文件、不绑架你的数据。
 
-![Table Fields 在 Obsidian 里把普通 Markdown 表格变成可操作控件。](assets/readme/01-table-fields-overview.png)
+![下拉字段让表格取值保持统一，同时日期、金额和复选框仍然清楚可读。](assets/readme/01-dropdown-field.png)
 
 ## 它能做什么
 
@@ -41,7 +41,9 @@ cols:
 ……在笔记里它就变成一张表：**Status** 是下拉，**Due** 显示成整洁的日期，**Done** 是一个能点的真复选框。
 点一下，改动就直接存回表格里。
 
-![右键列头即可选择这一列的 Table Fields 类型。](assets/readme/02-column-type-menu.png)
+![右键列头即可选择这一列的 Table Fields 类型。](assets/readme/02-field-type-menu.png)
+
+![复选框字段可以直接在表格里勾选，并把值写回 Markdown。](assets/readme/03-checkbox-field.png)
 
 ## 它和别的有什么不同
 
@@ -50,6 +52,8 @@ cols:
 - **它不是另一个电子表格。** 有些表格工具把你的数据存成一段你再也看不懂的代码；Table Fields 从不这样，
   它始终是一张纯表格。
 - **随时可以关。** 关掉后你的笔记仍是干净可读的 Markdown 表格，数据不丢，也能在任何别的 App 里读。
+
+![关闭 Table Fields 后，笔记仍然是一张 Markdown 表格；US$ 这类只用于显示的格式会退回成磁盘里的纯数字。](assets/readme/04-markdown-fallback.png)
 
 ## 快速上手
 

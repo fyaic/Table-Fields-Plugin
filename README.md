@@ -11,7 +11,7 @@ like a tiny spreadsheet. And here's the promise: **underneath, it's still just a
 table.** Turn the plugin off and your note is exactly as readable as before. No database, no hidden
 file, no lock-in.
 
-![Table Fields turns plain Markdown tables into interactive controls inside Obsidian.](assets/readme/01-table-fields-overview.png)
+![Dropdown fields keep table values consistent while dates, currency, and checkboxes stay readable.](assets/readme/01-dropdown-field.png)
 
 ## What it does
 
@@ -44,7 +44,9 @@ cols:
 …and in your note it becomes a table where **Status** is a dropdown, **Due** shows a tidy date, and
 **Done** is a real checkbox you can click. Tick it, and the change is saved straight into the table.
 
-![Right-click a column header to choose its Table Fields type.](assets/readme/02-column-type-menu.png)
+![Right-click a column header to choose its Table Fields type.](assets/readme/02-field-type-menu.png)
+
+![Checkbox fields can be ticked directly from the table, with the value saved back to Markdown.](assets/readme/03-checkbox-field.png)
 
 ## Why it's different
 
@@ -54,6 +56,8 @@ cols:
   no longer read. Table Fields never does that — it stays a plain table.
 - **Disable it anytime.** Your note is still a clean, readable Markdown table. You never lose your
   data or your ability to read it in any other app.
+
+![With Table Fields disabled, the note is still a Markdown table; display-only formatting such as the US$ currency prefix falls back to the stored plain number.](assets/readme/04-markdown-fallback.png)
 
 ## Quick start
 
