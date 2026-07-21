@@ -91,23 +91,6 @@ That's it. Click your checkboxes and dropdowns; everything saves back into the n
 - **Date columns** — stored in a standard form, shown in your local date style.
 - **Right-click setup** — change any column's type from the table itself, no config screen needed.
 
-## Values stay plain text; formulas stay out of scope
-
-- Your values stay as **plain, readable text** — dates as `2026-07-22`, money as `1200.00`. The
-  pretty formatting is only on screen.
-- There are **no formulas** — this is on purpose. Table Fields is for light structure, not for
-  turning your note into Excel.
-- **Coming next:** right-click to add or remove rows and columns, edit dropdown choices from the
-  table menu, and sort.
-
-## Install manually until the community release
-
-Table Fields isn't in the community store yet. To try it:
-
-1. Copy this folder into `<your vault>/.obsidian/plugins/table-fields/`.
-2. In Obsidian: **Settings → Community plugins → enable Table Fields**.
-3. Open a note with a `table-fields` table (there's an example note in this repo's history).
-
 ---
 
 Curious how it works under the hood? See the **[Engineering README ›](ENGINEERING.md)**.
