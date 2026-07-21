@@ -4,6 +4,56 @@
 	/* keep it looking like a normal Obsidian table; only cell affordances change */
 }
 
+/* Settings: sub-tabs */
+.tf-tabbar {
+	display: flex;
+	gap: 4px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	margin-bottom: 16px;
+}
+
+.tf-tab {
+	background: transparent;
+	border: none;
+	box-shadow: none;
+	border-bottom: 2px solid transparent;
+	border-radius: 0;
+	padding: 8px 14px;
+	cursor: pointer;
+	color: var(--text-muted);
+	font-weight: var(--font-medium);
+}
+
+.tf-tab:hover {
+	color: var(--text-normal);
+	background: transparent;
+}
+
+.tf-tab-active {
+	color: var(--text-normal);
+	border-bottom-color: var(--interactive-accent);
+}
+
+.tf-skill-desc {
+	color: var(--text-muted);
+	margin-top: 0;
+}
+
+.tf-skill-bar {
+	margin-bottom: 8px;
+}
+
+.tf-skill-text {
+	width: 100%;
+	min-height: 340px;
+	resize: vertical;
+	font-family: var(--font-monospace);
+	font-size: 12px;
+	line-height: 1.5;
+	white-space: pre;
+	overflow: auto;
+}
+
 .tf-cell-center {
 	text-align: center;
 }

@@ -46,6 +46,15 @@ cols:
 
 ![Right-click a column header to choose its Table Fields type.](assets/readme/02-field-type-menu.png)
 
+## Dropdown choices are edited in Source mode
+
+Switch the note to **Source mode**, find the `type: "select"` column, and edit its `options: [...]`
+list. When you switch back to Reading view or Live Preview, the dropdown uses that list. Tip: if the
+new choices do not appear immediately, leave the note and open it again to refresh the rendered
+dropdown.
+
+![Edit dropdown choices in Source mode by changing the select column's options list.](assets/readme/05-edit-dropdown-options.png)
+
 ## Checkbox clicks write back to the Markdown table
 
 ![Checkbox fields can be ticked directly from the table, with the value saved back to Markdown.](assets/readme/03-checkbox-field.png)
@@ -88,7 +97,8 @@ That's it. Click your checkboxes and dropdowns; everything saves back into the n
   pretty formatting is only on screen.
 - There are **no formulas** — this is on purpose. Table Fields is for light structure, not for
   turning your note into Excel.
-- **Coming next:** right-click to add or remove rows and columns, edit dropdown choices, and sort.
+- **Coming next:** right-click to add or remove rows and columns, edit dropdown choices from the
+  table menu, and sort.
 
 ## Install manually until the community release
 

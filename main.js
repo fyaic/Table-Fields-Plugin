@@ -25,7 +25,7 @@
  *   -->
  */
 
-const { Plugin, Notice, MarkdownView, Menu, editorLivePreviewField } = require("obsidian");
+const { Plugin, Notice, MarkdownView, Menu, PluginSettingTab, MarkdownRenderer, editorLivePreviewField } = require("obsidian");
 const { StateField, RangeSetBuilder } = require("@codemirror/state");
 const { EditorView, Decoration, WidgetType } = require("@codemirror/view");
 
@@ -127,6 +127,9 @@ module.exports = class MarkdownSmartTablesPlugin extends Plugin {
 			name: "Mark table under cursor as Table Fields",
 			editorCallback: (editor) => this.markTableAsSmart(editor),
 		});
+
+		// Settings tab: Usage guide + copy-pasteable AI skill (two sub-tabs).
+		this.addSettingTab(new TableFieldsSettingTab(this.app, this));
 
 		console.log("[table-fields] loaded (v0.1 spike)");
 	}
@@ -579,3 +582,211 @@ const smartTableField = StateField.define({
 		return EditorView.decorations.from(f);
 	},
 });
+
+/* ============================================================================
+ * Settings tab — two sub-tabs: "Usage guide" and "AI skill" (copy-paste).
+ * ==========================================================================*/
+
+const USAGE_MD = [
+	"# Table Fields",
+	"",
+	"Plain Markdown tables you can click: checkboxes, dropdowns, and tidy dates, money, and",
+	"percentages — all inside your note. It stays a normal table underneath.",
+	"",
+	"## What it does",
+	"",
+	"- **Checkboxes you can tick** — click to mark something done, right in the table.",
+	"- **Dropdowns** — pick a status or category from a fixed list, so values never drift.",
+	"- **Money, %, and dates that look right** — amounts line up with a currency symbol, dates read",
+	"  in your local format, percentages align neatly.",
+	"- **Right-click a column header** to set what it is — no config screen to hunt through.",
+	"- **Works while you read *and* while you edit.**",
+	"- **Nothing locked in** — it is always a plain Markdown table on disk.",
+	"",
+	"## Set up a table",
+	"",
+	"Put a small config comment directly above a normal pipe table:",
+	"",
+	"    <!-- table-fields id=\"tasks\" v=\"1\"",
+	"    cols:",
+	"      - {name: \"Task\",   type: \"text\"}",
+	"      - {name: \"Status\", type: \"select\", options: [\"Todo\",\"Doing\",\"Done\"]}",
+	"      - {name: \"Due\",    type: \"date\"}",
+	"      - {name: \"Done\",   type: \"checkbox\"}",
+	"    -->",
+	"    | Task      | Status | Due        | Done |",
+	"    | --------- | ------ | ---------- | ---- |",
+	"    | Draft PRD | Doing  | 2026-07-22 | [x]  |",
+	"",
+	"Or: put your cursor in any normal table and run the command **Table Fields: Mark table under",
+	"cursor as Table Fields** — it sets up the columns from your data. Then right-click a header to",
+	"change a type.",
+	"",
+	"## Field types",
+	"",
+	"- **text** — plain text.",
+	"- **checkbox** — stored as [x] or [ ], shown as a clickable box.",
+	"- **select** — a dropdown; the choices come from the column's options list.",
+	"- **date** — stored as YYYY-MM-DD, shown in your local date style.",
+	"- **currency** — a plain number (e.g. 1200.00); the symbol comes from options (e.g. USD).",
+	"- **percentage** — kept as simple NN% text, right-aligned.",
+	"",
+	"## Good to know",
+	"",
+	"- Your values stay plain, readable text; the pretty formatting is only on screen.",
+	"- There are no formulas — this is on purpose.",
+	"- Turn the plugin off and every table is still clean Markdown.",
+].join("\n");
+
+const SKILL_TEXT = [
+	"You are assisting a user who uses the Table Fields plugin for Obsidian. Table Fields adds typed,",
+	"interactive columns (checkbox, dropdown, date, currency, percentage) to PLAIN Markdown tables,",
+	"using a small HTML config comment placed directly above each table. The table on disk stays a",
+	"normal GFM pipe table. Help the user read, create, and edit these tables while following the",
+	"syntax and storage rules below. Never add formulas and never convert a table into a database or JSON.",
+	"",
+	"THE CONFIG COMMENT",
+	"A Table Fields table is a normal Markdown pipe table with a config comment immediately above it",
+	"(blank lines between them are allowed):",
+	"",
+	"    <!-- table-fields id=\"tasks\" v=\"1\"",
+	"    cols:",
+	"      - {name: \"Task\",   type: \"text\"}",
+	"      - {name: \"Status\", type: \"select\", options: [\"Todo\",\"Doing\",\"Done\"]}",
+	"      - {name: \"Due\",    type: \"date\"}",
+	"      - {name: \"Amount\", type: \"currency\", options: [\"USD\"]}",
+	"      - {name: \"Done\",   type: \"checkbox\"}",
+	"    -->",
+	"    | Task | Status | Due | Amount | Done |",
+	"    | ---- | ------ | --- | ------ | ---- |",
+	"    | ...  | ...    | ... | ...    | ...  |",
+	"",
+	"- id: a short identifier, unique within the note.",
+	"- v: config version, keep it \"1\".",
+	"- cols: one entry per column, IN THE SAME ORDER as the table columns. Each entry is {name, type, options?}.",
+	"  - name should match the header cell text.",
+	"  - type is one of: text, checkbox, select, date, currency, percentage.",
+	"  - options: for select, the list of allowed values; for currency, a single ISO currency code such as [\"USD\"].",
+	"",
+	"HOW VALUES ARE STORED (use these exact forms when writing cells)",
+	"- text: plain text. Example: Draft PRD",
+	"- checkbox: [x] for checked, [ ] for unchecked.",
+	"- select: the exact option text. Example: Doing",
+	"- date: ISO date YYYY-MM-DD. Example: 2026-07-22",
+	"- currency: a plain number, no symbol or commas. Example: 1200.50",
+	"- percentage: a number followed by a percent sign. Example: 60%",
+	"Values are stored in this plain, canonical form; the plugin only formats them on screen.",
+	"",
+	"RULES",
+	"1. Keep it a valid GFM pipe table: a header row, a --- delimiter row, then data rows. Every row",
+	"   starts and ends with a pipe and has the same number of cells as there are columns.",
+	"2. The config comment must sit directly above its table, and cols order must match the table's",
+	"   column order.",
+	"3. Do not invent formulas or computed cells. Percentages and currency are literal values.",
+	"4. For select cells, only use values listed in that column's options. If a new value is needed,",
+	"   add it to options as well.",
+	"5. For checkbox cells, only use [x] or [ ].",
+	"6. For dates, always write ISO YYYY-MM-DD in the source (the plugin displays them localized).",
+	"7. For currency, store the number only (e.g. 59.00); the symbol comes from options.",
+	"8. Preserve the user's other columns and rows; do not reorder columns unless asked.",
+	"9. If a note has multiple tables, give each a distinct id.",
+	"",
+	"READING A TABLE",
+	"Read the config comment to learn each column's type, then interpret the cells: [x] means",
+	"done/true, a currency number is money in that column's currency, 60% means sixty percent, a",
+	"select value is one of the allowed options. Use these meanings to summarize, filter, or answer.",
+	"",
+	"CREATING OR EDITING A TABLE",
+	"- Create: write the config comment, then the pipe table, using the storage forms above.",
+	"- Edit a value: change only the target cell, keeping its canonical form.",
+	"- Add a column: add a cols entry AND add a cell to the header row, the delimiter row, and every data row.",
+	"- Add a row: add one pipe row with a value per column in canonical form.",
+	"- Change a column's type: update its type in cols (and options if needed), and make sure existing",
+	"  cell values match the new type's storage form.",
+	"",
+	"EXAMPLE",
+	"User: \"Mark 'Draft PRD' as done and add a Priority column with Low/Medium/High.\"",
+	"You: set that row's Done cell to [x]; add {name: \"Priority\", type: \"select\", options:",
+	"[\"Low\",\"Medium\",\"High\"]} to cols; add a Priority header cell, a delimiter cell, and a value such",
+	"as High to every data row.",
+].join("\n");
+
+async function renderMarkdownInto(app, md, el, component) {
+	try {
+		if (MarkdownRenderer && typeof MarkdownRenderer.render === "function") {
+			await MarkdownRenderer.render(app, md, el, "", component);
+		} else if (MarkdownRenderer && typeof MarkdownRenderer.renderMarkdown === "function") {
+			await MarkdownRenderer.renderMarkdown(md, el, "", component);
+		} else {
+			el.setText(md);
+		}
+	} catch (e) {
+		el.setText(md);
+	}
+}
+
+class TableFieldsSettingTab extends PluginSettingTab {
+	constructor(app, plugin) {
+		super(app, plugin);
+		this.plugin = plugin;
+		this.activeTab = "usage";
+	}
+
+	display() {
+		const { containerEl } = this;
+		containerEl.empty();
+		containerEl.addClass("tf-settings");
+
+		const tabbar = containerEl.createDiv({ cls: "tf-tabbar" });
+		const body = containerEl.createDiv({ cls: "tf-tabbody" });
+
+		const buttons = {};
+		const show = (key) => {
+			this.activeTab = key;
+			for (const k in buttons) buttons[k].toggleClass("tf-tab-active", k === key);
+			body.empty();
+			if (key === "skill") this.renderSkill(body);
+			else this.renderUsage(body);
+		};
+		const defs = [
+			{ key: "usage", label: "Usage guide" },
+			{ key: "skill", label: "AI skill" },
+		];
+		for (const d of defs) {
+			const btn = tabbar.createEl("button", { text: d.label, cls: "tf-tab" });
+			buttons[d.key] = btn;
+			btn.onclick = () => show(d.key);
+		}
+		show(this.activeTab);
+	}
+
+	renderUsage(el) {
+		const md = el.createDiv({ cls: "tf-usage markdown-rendered" });
+		renderMarkdownInto(this.app, USAGE_MD, md, this.plugin);
+	}
+
+	renderSkill(el) {
+		el.createEl("p", {
+			cls: "tf-skill-desc",
+			text:
+				"Copy this and paste it into your AI assistant (Claude, ChatGPT, etc.) so it understands " +
+				"Table Fields and can read or edit your tables for you.",
+		});
+		const bar = el.createDiv({ cls: "tf-skill-bar" });
+		const copyBtn = bar.createEl("button", { text: "Copy to clipboard", cls: "mod-cta" });
+		const ta = el.createEl("textarea", { cls: "tf-skill-text" });
+		ta.value = SKILL_TEXT;
+		ta.readOnly = true;
+		ta.spellcheck = false;
+		ta.setAttr("rows", "22");
+		copyBtn.onclick = async () => {
+			try {
+				await navigator.clipboard.writeText(SKILL_TEXT);
+				new Notice("Copied Table Fields AI skill to clipboard");
+			} catch (e) {
+				ta.select();
+				new Notice("Press Ctrl/Cmd-C to copy the selected text");
+			}
+		};
+	}
+}

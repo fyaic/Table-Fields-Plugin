@@ -43,6 +43,14 @@ cols:
 
 ![右键列头即可选择这一列的 Table Fields 类型。](assets/readme/02-field-type-menu.png)
 
+## 下拉选项在 Source mode 里直接改
+
+切到 **Source mode**，找到 `type: "select"` 的那一列，编辑它的 `options: [...]` 列表。改完切回阅读视图或
+Live Preview，下拉列表就会使用这些选项。小提示：如果新选项没有立刻出现，退出这篇 note 再重新打开一次，
+让渲染刷新。
+
+![在 Source mode 里修改 select 列的 options 列表即可编辑下拉选项。](assets/readme/05-edit-dropdown-options.png)
+
 ## 勾选复选框会写回 Markdown 表格
 
 ![复选框字段可以直接在表格里勾选，并把值写回 Markdown。](assets/readme/03-checkbox-field.png)
@@ -79,7 +87,7 @@ cols:
 
 - 你的值始终是**纯、可读的文本**——日期是 `2026-07-22`，金额是 `1200.00`。漂亮的格式只在屏幕上。
 - **没有公式**——这是刻意的。Table Fields 只做轻量结构，不是要把你的笔记变成 Excel。
-- **接下来会做：** 右键增删行/列、编辑下拉选项、排序。
+- **接下来会做：** 右键增删行/列、在表格菜单里编辑下拉选项、排序。
 
 ## 进社区商店前先手动安装
 
