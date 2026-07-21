@@ -25,7 +25,7 @@
  *   -->
  */
 
-const { Plugin, Notice, MarkdownView, Menu, PluginSettingTab, MarkdownRenderer, editorLivePreviewField } = require("obsidian");
+const { Plugin, Notice, MarkdownView, Menu, PluginSettingTab, MarkdownRenderer, Component, editorLivePreviewField } = require("obsidian");
 const { StateField, RangeSetBuilder } = require("@codemirror/state");
 const { EditorView, Decoration, WidgetType } = require("@codemirror/view");
 
@@ -193,7 +193,7 @@ module.exports = class MarkdownSmartTablesPlugin extends Plugin {
 				break;
 			}
 			case "select": {
-				const select = document.createElement("select");
+				const select = activeDocument.createElement("select");
 				select.classList.add("tf-select");
 				const opts = col.options && col.options.length ? col.options : [raw];
 				if (!opts.includes(raw)) opts.unshift(raw); // keep current value selectable
@@ -417,7 +417,7 @@ function renderWidgetCell(td, col, cell, view) {
 			break;
 		}
 		case "select": {
-			const select = document.createElement("select");
+			const select = activeDocument.createElement("select");
 			select.classList.add("tf-select");
 			const opts = col.options && col.options.length ? col.options.slice() : [raw];
 			if (!opts.includes(raw)) opts.unshift(raw);
@@ -462,15 +462,15 @@ class SmartTableWidget extends WidgetType {
 		return other && other.data && other.data.signature === this.data.signature;
 	}
 	toDOM(view) {
-		const wrap = document.createElement("div");
+		const wrap = activeDocument.createElement("div");
 		wrap.className = "tf-lp-wrap";
-		const table = document.createElement("table");
+		const table = activeDocument.createElement("table");
 		table.className = "tf-table tf-lp-table";
 
-		const thead = document.createElement("thead");
-		const htr = document.createElement("tr");
+		const thead = activeDocument.createElement("thead");
+		const htr = activeDocument.createElement("tr");
 		this.data.config.cols.forEach((col, colIndex) => {
-			const th = document.createElement("th");
+			const th = activeDocument.createElement("th");
 			th.textContent = col.name;
 			th.classList.add("tf-th");
 			th.setAttr("title", "Right-click to set column type");
@@ -483,12 +483,12 @@ class SmartTableWidget extends WidgetType {
 		thead.appendChild(htr);
 		table.appendChild(thead);
 
-		const tbody = document.createElement("tbody");
+		const tbody = activeDocument.createElement("tbody");
 		for (const row of this.data.rows) {
-			const tr = document.createElement("tr");
+			const tr = activeDocument.createElement("tr");
 			row.cells.forEach((cell, colIndex) => {
 				const col = this.data.config.cols[colIndex];
-				const td = document.createElement("td");
+				const td = activeDocument.createElement("td");
 				if (col) renderWidgetCell(td, col, cell, view);
 				else td.textContent = (cell.text || "").trim();
 				tr.appendChild(td);
@@ -740,6 +740,14 @@ class TableFieldsSettingTab extends PluginSettingTab {
 		super(app, plugin);
 		this.plugin = plugin;
 		this.activeTab = "usage";
+		this.previewComponent = null;
+	}
+
+	hide() {
+		if (this.previewComponent) {
+			this.previewComponent.unload();
+			this.previewComponent = null;
+		}
 	}
 
 	display() {
@@ -780,7 +788,10 @@ class TableFieldsSettingTab extends PluginSettingTab {
 				return "";
 			}
 		};
-		renderMarkdownInto(this.app, buildUsageMd(img), md, this.plugin);
+		if (this.previewComponent) this.previewComponent.unload();
+		this.previewComponent = new Component();
+		this.previewComponent.load();
+		renderMarkdownInto(this.app, buildUsageMd(img), md, this.previewComponent);
 	}
 
 	renderSkill(el) {
@@ -797,14 +808,16 @@ class TableFieldsSettingTab extends PluginSettingTab {
 		ta.readOnly = true;
 		ta.spellcheck = false;
 		ta.setAttr("rows", "22");
-		copyBtn.onclick = async () => {
-			try {
-				await navigator.clipboard.writeText(SKILL_TEXT);
-				new Notice("Copied Table Fields AI skill to clipboard");
-			} catch (e) {
-				ta.select();
-				new Notice("Press Ctrl/Cmd-C to copy the selected text");
-			}
+		copyBtn.onclick = () => {
+			void (async () => {
+				try {
+					await navigator.clipboard.writeText(SKILL_TEXT);
+					new Notice("Copied Table Fields AI skill to clipboard");
+				} catch (e) {
+					ta.select();
+					new Notice("Press Ctrl/Cmd-C to copy the selected text");
+				}
+			})();
 		};
 	}
 }

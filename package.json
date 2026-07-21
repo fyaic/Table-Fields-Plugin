@@ -1,0 +1,16 @@
+{
+	"name": "table-fields",
+	"version": "0.1.0",
+	"description": "Give Markdown table columns a type — checkbox, select, date, currency, percentage — with inline controls in Live Preview and Reading view. Stays a plain pipe table on disk.",
+	"keywords": ["obsidian", "obsidian-plugin", "markdown", "table", "spreadsheet"],
+	"author": "fyaic",
+	"license": "MIT",
+	"homepage": "https://github.com/fyaic/Table-Fields-Plugin",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/fyaic/Table-Fields-Plugin.git"
+	},
+	"bugs": {
+		"url": "https://github.com/fyaic/Table-Fields-Plugin/issues"
+	}
+}

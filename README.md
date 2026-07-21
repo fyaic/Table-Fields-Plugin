@@ -99,6 +99,12 @@ the Table Fields syntax and can read, create, and edit your tables for you.
 
 ![The AI skill tab in Table Fields settings, with a Copy to clipboard button and the ready-made prompt.](assets/readme/06-ai-skill-in-settings.png)
 
+## Privacy & payment
+
+**Free, and fully local.** Table Fields only reads and writes the tables in your own notes — nothing
+is sent off your device, there are no accounts or API keys, and the developer collects nothing. See
+**[PRIVACY.md](PRIVACY.md)** for the full data-flow.
+
 ---
 
 Curious how it works under the hood? See the **[Engineering README ›](ENGINEERING.md)**.

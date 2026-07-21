@@ -91,6 +91,11 @@ Table Fields 内置了一段给 AI 的现成提示词。打开 **设置 → Tabl
 
 ![Table Fields 设置里的 AI skill 标签页，带一个 Copy to clipboard 按钮和现成的提示词。](assets/readme/06-ai-skill-in-settings.png)
 
+## 隐私与收费
+
+**免费，且完全本地。** Table Fields 只读写你自己笔记里的表格——没有任何数据离开你的设备，没有账号或
+API key，开发者不收集任何东西。完整数据流见 **[PRIVACY.md](PRIVACY.md)**。
+
 ---
 
 想知道它背后怎么实现的？看 **[工程文档 ›](ENGINEERING.zh-CN.md)**。
