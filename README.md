@@ -11,9 +11,9 @@ like a tiny spreadsheet. And here's the promise: **underneath, it's still just a
 table.** Turn the plugin off and your note is exactly as readable as before. No database, no hidden
 file, no lock-in.
 
-![Dropdown fields keep table values consistent while dates, currency, and checkboxes stay readable.](assets/readme/01-dropdown-field.png)
+## Dropdown, date, money, and checkbox fields render in the note
 
-## What it does
+![Dropdown fields keep table values consistent while dates, currency, and checkboxes stay readable.](assets/readme/01-dropdown-field.png)
 
 - ☑️ **Checkboxes you can tick** — click to mark something done, right in the table.
 - 🔽 **Dropdowns** — pick a status or category from a fixed list, so values never drift.
@@ -23,7 +23,7 @@ file, no lock-in.
 - 👀 **Works while you read *and* while you edit** — the controls show up in both modes.
 - 🧹 **Nothing locked in** — it's always a plain Markdown table on disk.
 
-## See it
+## A tiny comment gives each column its field type
 
 You write (or generate) a small note like this:
 
@@ -46,9 +46,11 @@ cols:
 
 ![Right-click a column header to choose its Table Fields type.](assets/readme/02-field-type-menu.png)
 
+## Checkbox clicks write back to the Markdown table
+
 ![Checkbox fields can be ticked directly from the table, with the value saved back to Markdown.](assets/readme/03-checkbox-field.png)
 
-## Why it's different
+## Turning the plugin off leaves a readable Markdown table
 
 - **It's not a database.** Tools like Obsidian Bases turn every row into a separate note. Table
   Fields keeps everything in *one table in one note*.
@@ -59,7 +61,7 @@ cols:
 
 ![With Table Fields disabled, the note is still a Markdown table; display-only formatting such as the US$ currency prefix falls back to the stored plain number.](assets/readme/04-markdown-fallback.png)
 
-## Quick start
+## Mark any ordinary Markdown table to start
 
 1. Write a normal Markdown table.
 2. Put your cursor in it and run the command **"Table Fields: Mark table under cursor as Table
@@ -69,7 +71,7 @@ cols:
 
 That's it. Click your checkboxes and dropdowns; everything saves back into the note automatically.
 
-## Features, one by one
+## Each field type keeps one kind of value tidy
 
 - **Checkbox columns** — turn a column of `done / not done` into clickable boxes.
 - **Dropdown (select) columns** — give a column a fixed set of choices (like *Todo / Doing / Done*)
@@ -80,7 +82,7 @@ That's it. Click your checkboxes and dropdowns; everything saves back into the n
 - **Date columns** — stored in a standard form, shown in your local date style.
 - **Right-click setup** — change any column's type from the table itself, no config screen needed.
 
-## Good to know
+## Values stay plain text; formulas stay out of scope
 
 - Your values stay as **plain, readable text** — dates as `2026-07-22`, money as `1200.00`. The
   pretty formatting is only on screen.
@@ -88,7 +90,7 @@ That's it. Click your checkboxes and dropdowns; everything saves back into the n
   turning your note into Excel.
 - **Coming next:** right-click to add or remove rows and columns, edit dropdown choices, and sort.
 
-## Install (for now)
+## Install manually until the community release
 
 Table Fields isn't in the community store yet. To try it:
 
