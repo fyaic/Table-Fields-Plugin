@@ -91,6 +91,14 @@ That's it. Click your checkboxes and dropdowns; everything saves back into the n
 - **Date columns** — stored in a standard form, shown in your local date style.
 - **Right-click setup** — change any column's type from the table itself, no config screen needed.
 
+## Let your AI read and edit your tables
+
+Table Fields ships a ready-made prompt for your AI. Open **Settings → Table Fields → AI skill** and
+hit **Copy to clipboard**, then paste it into Claude, ChatGPT, or any assistant — now it understands
+the Table Fields syntax and can read, create, and edit your tables for you.
+
+![The AI skill tab in Table Fields settings, with a Copy to clipboard button and the ready-made prompt.](assets/readme/06-ai-skill-in-settings.png)
+
 ---
 
 Curious how it works under the hood? See the **[Engineering README ›](ENGINEERING.md)**.

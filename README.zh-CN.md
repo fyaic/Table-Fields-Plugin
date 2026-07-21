@@ -83,6 +83,14 @@ Live Preview，下拉列表就会使用这些选项。小提示：如果新选�
 - **日期列**——按标准格式存储，按你本地日期风格显示。
 - **右键设定**——直接在表格上改任意列的类型，不需要配置页。
 
+## 让你的 AI 读写你的表格
+
+Table Fields 内置了一段给 AI 的现成提示词。打开 **设置 → Table Fields → AI skill**，点
+**Copy to clipboard**，粘贴给 Claude、ChatGPT 或任意助手——它就懂 Table Fields 的语法，能帮你读取、
+新建、修改表格了。
+
+![Table Fields 设置里的 AI skill 标签页，带一个 Copy to clipboard 按钮和现成的提示词。](assets/readme/06-ai-skill-in-settings.png)
+
 ---
 
 想知道它背后怎么实现的？看 **[工程文档 ›](ENGINEERING.zh-CN.md)**。

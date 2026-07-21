@@ -587,11 +587,14 @@ const smartTableField = StateField.define({
  * Settings tab — two sub-tabs: "Usage guide" and "AI skill" (copy-paste).
  * ==========================================================================*/
 
-const USAGE_MD = [
+function buildUsageMd(img) {
+	return [
 	"# Table Fields",
 	"",
 	"Plain Markdown tables you can click: checkboxes, dropdowns, and tidy dates, money, and",
 	"percentages — all inside your note. It stays a normal table underneath.",
+	"",
+	"![Dropdown, date, money, and checkbox fields render right in the note.](" + img("01-dropdown-field.png") + ")",
 	"",
 	"## What it does",
 	"",
@@ -622,6 +625,8 @@ const USAGE_MD = [
 	"cursor as Table Fields** — it sets up the columns from your data. Then right-click a header to",
 	"change a type.",
 	"",
+	"![Right-click a column header to choose its field type.](" + img("02-field-type-menu.png") + ")",
+	"",
 	"## Field types",
 	"",
 	"- **text** — plain text.",
@@ -631,12 +636,17 @@ const USAGE_MD = [
 	"- **currency** — a plain number (e.g. 1200.00); the symbol comes from options (e.g. USD).",
 	"- **percentage** — kept as simple NN% text, right-aligned.",
 	"",
+	"![Ticking a checkbox writes the value straight back to the Markdown table.](" + img("03-checkbox-field.png") + ")",
+	"",
 	"## Good to know",
 	"",
 	"- Your values stay plain, readable text; the pretty formatting is only on screen.",
 	"- There are no formulas — this is on purpose.",
 	"- Turn the plugin off and every table is still clean Markdown.",
-].join("\n");
+	"",
+	"![With the plugin off, the note is still a clean Markdown table.](" + img("04-markdown-fallback.png") + ")",
+	].join("\n");
+}
 
 const SKILL_TEXT = [
 	"You are assisting a user who uses the Table Fields plugin for Obsidian. Table Fields adds typed,",
@@ -762,7 +772,15 @@ class TableFieldsSettingTab extends PluginSettingTab {
 
 	renderUsage(el) {
 		const md = el.createDiv({ cls: "tf-usage markdown-rendered" });
-		renderMarkdownInto(this.app, USAGE_MD, md, this.plugin);
+		const dir = (this.plugin.manifest && this.plugin.manifest.dir) || ".obsidian/plugins/table-fields";
+		const img = (file) => {
+			try {
+				return this.app.vault.adapter.getResourcePath(dir + "/assets/readme/" + file);
+			} catch (e) {
+				return "";
+			}
+		};
+		renderMarkdownInto(this.app, buildUsageMd(img), md, this.plugin);
 	}
 
 	renderSkill(el) {

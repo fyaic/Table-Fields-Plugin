@@ -34,6 +34,14 @@
 	border-bottom-color: var(--interactive-accent);
 }
 
+.tf-usage img {
+	max-width: 100%;
+	height: auto;
+	margin: 8px 0;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+}
+
 .tf-skill-desc {
 	color: var(--text-muted);
 	margin-top: 0;
