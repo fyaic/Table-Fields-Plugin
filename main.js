@@ -14,7 +14,7 @@
  *     source (known limitation) — controls simply aren't shown then. That is the honest,
  *     non-surprising fallback the PRD §9 describes, not a bug.
  *
- * Config lives in an HTML comment directly above the table (PRD §10, Strategy A), e.g.:
+ * Config lives in an HTML comment above the table, followed by one empty line (PRD §10, Strategy A), e.g.:
  *   <!-- table-fields id="tasks" v="1"
  *   cols:
  *     - {name: "Task",   type: "text"}
@@ -25,7 +25,7 @@
  *   -->
  */
 
-const { Plugin, Notice, MarkdownView, Menu, PluginSettingTab, MarkdownRenderer, Component, editorLivePreviewField } = require("obsidian");
+const { Plugin, Notice, MarkdownView, Menu, PluginSettingTab, MarkdownRenderer, Component, Keymap, editorInfoField, editorLivePreviewField } = require("obsidian");
 const { StateField, RangeSetBuilder } = require("@codemirror/state");
 const { EditorView, Decoration, WidgetType } = require("@codemirror/view");
 
@@ -82,9 +82,65 @@ function isChecked(raw) {
 	return /^\[[xX]\]$/.test(raw.trim());
 }
 
+// Index of the next run of exactly n backticks at or after `from`, or -1.
+function findBacktickRun(line, from, n) {
+	let i = from;
+	while (i < line.length) {
+		if (line[i] !== "`") { i++; continue; }
+		let k = 0;
+		while (line[i + k] === "`") k++;
+		if (k === n) return i;
+		i += k;
+	}
+	return -1;
+}
+
+// Indices of the pipes in a table row that separate cells. A pipe is cell content,
+// not a separator, when escaped (\|), inside a [[wikilink|alias]], or inside `code`
+// - the same pipes Obsidian keeps inside a cell when it renders the table.
+function findSeparatorPipes(line) {
+	const pipes = [];
+	let i = 0;
+	while (i < line.length) {
+		const ch = line[i];
+		if (ch === "\\") { i += 2; continue; } // escaped char, e.g. \|
+		if (ch === "`") {
+			let n = 1;
+			while (line[i + n] === "`") n++;
+			const close = findBacktickRun(line, i + n, n);
+			i = close < 0 ? i + n : close + n; // unclosed run is literal text
+			continue;
+		}
+		if (ch === "[" && line[i + 1] === "[") {
+			const close = line.indexOf("]]", i + 2);
+			if (close >= 0) { i = close + 2; continue; }
+		}
+		if (ch === "|") pipes.push(i);
+		i++;
+	}
+	return pipes;
+}
+
+// Cell source -> displayed value: \| shows as |.
+function unescapePipes(s) {
+	return s.replace(/\\\|/g, "|");
+}
+
+// Value -> cell source: every pipe written as \| so it cannot split the row.
+function escapePipes(s) {
+	return unescapePipes(s).replace(/\|/g, "\\|");
+}
+
 // Split a Markdown table row into { parts, cellOffset } so cell index -> parts index.
+// parts.join("|") restores the line exactly.
 function splitRow(line) {
-	const parts = line.split("|");
+	const parts = [];
+	let from = 0;
+	for (const p of findSeparatorPipes(line)) {
+		parts.push(line.slice(from, p));
+		from = p + 1;
+	}
+	parts.push(line.slice(from));
 	// leading pipe => parts[0] is empty/whitespace; cells begin at index 1
 	const leading = parts.length > 0 && parts[0].trim() === "";
 	return { parts, cellOffset: leading ? 1 : 0 };
@@ -247,7 +303,7 @@ module.exports = class MarkdownSmartTablesPlugin extends Plugin {
 			const { parts, cellOffset } = splitRow(lineText);
 			const idx = cellOffset + colIndex;
 			if (idx < 0 || idx >= parts.length) return null;
-			parts[idx] = " " + newValue + " ";
+			parts[idx] = " " + escapePipes(newValue) + " ";
 			return parts.join("|");
 		};
 
@@ -311,7 +367,7 @@ module.exports = class MarkdownSmartTablesPlugin extends Plugin {
 			`<!-- table-fields id="${id}" v="1"\n` +
 			`cols:\n` +
 			cols.join("\n") +
-			`\n-->\n`;
+			`\n-->\n\n`; // empty line before the table, or Obsidian does not render it as a table
 
 		editor.replaceRange(comment, { line: top, ch: 0 });
 		new Notice(`Table Fields: marked "${id}" (${headerCells.length} columns). Edit the comment to set column types.`);
@@ -387,8 +443,7 @@ function serializeConfig(config) {
 
 // Split a table row into cell segments with absolute doc offsets (between pipes).
 function getCellRanges(lineText, lineFrom) {
-	const pipes = [];
-	for (let i = 0; i < lineText.length; i++) if (lineText[i] === "|") pipes.push(i);
+	const pipes = findSeparatorPipes(lineText);
 	const cells = [];
 	for (let k = 0; k < pipes.length - 1; k++) {
 		const innerFrom = pipes[k] + 1;
@@ -400,12 +455,24 @@ function getCellRanges(lineText, lineFrom) {
 
 // Replace one cell's source range via a CM6 transaction (the write-back, Q2).
 function dispatchCell(view, cell, newValue) {
-	view.dispatch({ changes: { from: cell.from, to: cell.to, insert: " " + newValue + " " } });
+	view.dispatch({ changes: { from: cell.from, to: cell.to, insert: " " + escapePipes(newValue) + " " } });
+}
+
+// Render a text cell's Markdown (<br>, links, bold, code, ...) the way a native table
+// cell shows it. Without a render context (no app found) it falls back to plain text.
+function renderCellMarkdown(td, text, md) {
+	if (!md || !text) {
+		td.textContent = text;
+		return;
+	}
+	td.classList.add("tf-cell-md");
+	renderMarkdownInto(md.app, text, td, md.component, md.sourcePath);
 }
 
 // Render a single interactive/formatted cell into `td` for the Live Preview widget.
-function renderWidgetCell(td, col, cell, view) {
-	const raw = (cell.text || "").trim();
+// `md` is { app, sourcePath, component } for Markdown rendering of text cells, or null.
+function renderWidgetCell(td, col, cell, view, md) {
+	const raw = unescapePipes((cell.text || "").trim());
 	switch (col.type) {
 		case "checkbox": {
 			if (!CHECKBOX_RE.test(raw)) { td.textContent = raw; return; }
@@ -448,7 +515,7 @@ function renderWidgetCell(td, col, cell, view) {
 			break;
 		}
 		default:
-			td.textContent = raw;
+			renderCellMarkdown(td, raw, md);
 	}
 }
 
@@ -464,6 +531,26 @@ class SmartTableWidget extends WidgetType {
 	toDOM(view) {
 		const wrap = activeDocument.createElement("div");
 		wrap.className = "tf-lp-wrap";
+
+		// Render context for Markdown text cells; the component owns the rendered
+		// children and is unloaded in destroy().
+		const info = view.state.field(editorInfoField, false);
+		const app = info && info.app;
+		let md = null;
+		if (app) {
+			const component = new Component();
+			component.load();
+			wrap.tfComponent = component;
+			md = { app, sourcePath: info.file ? info.file.path : "", component };
+			// ignoreEvent() keeps the editor from handling clicks, so open internal links here.
+			wrap.addEventListener("click", (evt) => {
+				const a = evt.target.closest && evt.target.closest("a.internal-link");
+				if (!a) return;
+				evt.preventDefault();
+				const target = a.getAttribute("data-href") || a.getAttribute("href");
+				if (target) app.workspace.openLinkText(target, md.sourcePath, Keymap.isModEvent(evt));
+			});
+		}
 		const table = activeDocument.createElement("table");
 		table.className = "tf-table tf-lp-table";
 
@@ -489,8 +576,8 @@ class SmartTableWidget extends WidgetType {
 			row.cells.forEach((cell, colIndex) => {
 				const col = this.data.config.cols[colIndex];
 				const td = activeDocument.createElement("td");
-				if (col) renderWidgetCell(td, col, cell, view);
-				else td.textContent = (cell.text || "").trim();
+				if (col) renderWidgetCell(td, col, cell, view, md);
+				else renderCellMarkdown(td, unescapePipes((cell.text || "").trim()), md);
 				tr.appendChild(td);
 			});
 			tbody.appendChild(tr);
@@ -498,6 +585,9 @@ class SmartTableWidget extends WidgetType {
 		table.appendChild(tbody);
 		wrap.appendChild(table);
 		return wrap;
+	}
+	destroy(dom) {
+		if (dom.tfComponent) dom.tfComponent.unload();
 	}
 	// Right-click a header -> pick the column's type (rewrites the config comment).
 	showColumnMenu(view, colIndex, col, evt) {
@@ -540,11 +630,12 @@ function buildSmartTableDecorations(state) {
 		const sel = state.selection.main;
 		const builder = new RangeSetBuilder();
 		for (const t of tables) {
-			const fromLine = state.doc.line(t.configStartLine + 1);
+			// Replace the table only; the config comment above stays visible and editable.
+			const fromLine = state.doc.line(t.headerLine + 1);
 			const toLine = state.doc.line(t.lastRowLine + 1);
 			const from = fromLine.from;
 			const to = toLine.to;
-			if (sel.to >= from && sel.from <= to) continue; // cursor inside -> show source
+			if (sel.to >= from && sel.from <= to) continue; // cursor inside table -> show source
 
 			const rows = [];
 			const sigParts = [];
@@ -555,7 +646,7 @@ function buildSmartTableDecorations(state) {
 				sigParts.push(cells.map((c) => c.text).join("|"));
 			}
 			const signature =
-				from + ":" + to + ":" + t.config.cols.map((c) => c.type + "/" + (c.options || []).join(".")).join(",") + ":" + sigParts.join("//");
+				from + ":" + to + ":" + t.config.cols.map((c) => c.name + "/" + c.type + "/" + (c.options || []).join(".")).join(",") + ":" + sigParts.join("//");
 			const configRange = {
 				from: state.doc.line(t.configStartLine + 1).from,
 				to: state.doc.line(t.commentEndLine + 1).to,
@@ -608,7 +699,7 @@ function buildUsageMd(img) {
 	"",
 	"## Set up a table",
 	"",
-	"Put a small config comment directly above a normal pipe table:",
+	"Put a small config comment above a normal pipe table, with one empty line in between:",
 	"",
 	"    <!-- table-fields id=\"tasks\" v=\"1\"",
 	"    cols:",
@@ -617,6 +708,7 @@ function buildUsageMd(img) {
 	"      - {name: \"Due\",    type: \"date\"}",
 	"      - {name: \"Done\",   type: \"checkbox\"}",
 	"    -->",
+	"",
 	"    | Task      | Status | Due        | Done |",
 	"    | --------- | ------ | ---------- | ---- |",
 	"    | Draft PRD | Doing  | 2026-07-22 | [x]  |",
@@ -651,13 +743,13 @@ function buildUsageMd(img) {
 const SKILL_TEXT = [
 	"You are assisting a user who uses the Table Fields plugin for Obsidian. Table Fields adds typed,",
 	"interactive columns (checkbox, dropdown, date, currency, percentage) to PLAIN Markdown tables,",
-	"using a small HTML config comment placed directly above each table. The table on disk stays a",
+	"using a small HTML config comment placed above each table. The table on disk stays a",
 	"normal GFM pipe table. Help the user read, create, and edit these tables while following the",
 	"syntax and storage rules below. Never add formulas and never convert a table into a database or JSON.",
 	"",
 	"THE CONFIG COMMENT",
-	"A Table Fields table is a normal Markdown pipe table with a config comment immediately above it",
-	"(blank lines between them are allowed):",
+	"A Table Fields table is a normal Markdown pipe table with a config comment above it, separated",
+	"by one empty line (without it Obsidian does not render the table):",
 	"",
 	"    <!-- table-fields id=\"tasks\" v=\"1\"",
 	"    cols:",
@@ -667,6 +759,7 @@ const SKILL_TEXT = [
 	"      - {name: \"Amount\", type: \"currency\", options: [\"USD\"]}",
 	"      - {name: \"Done\",   type: \"checkbox\"}",
 	"    -->",
+	"",
 	"    | Task | Status | Due | Amount | Done |",
 	"    | ---- | ------ | --- | ------ | ---- |",
 	"    | ...  | ...    | ... | ...    | ...  |",
@@ -690,8 +783,8 @@ const SKILL_TEXT = [
 	"RULES",
 	"1. Keep it a valid GFM pipe table: a header row, a --- delimiter row, then data rows. Every row",
 	"   starts and ends with a pipe and has the same number of cells as there are columns.",
-	"2. The config comment must sit directly above its table, and cols order must match the table's",
-	"   column order.",
+	"2. The config comment must sit directly above its table with exactly one empty line between",
+	"   them, and cols order must match the table's column order.",
 	"3. Do not invent formulas or computed cells. Percentages and currency are literal values.",
 	"4. For select cells, only use values listed in that column's options. If a new value is needed,",
 	"   add it to options as well.",
@@ -721,12 +814,12 @@ const SKILL_TEXT = [
 	"as High to every data row.",
 ].join("\n");
 
-async function renderMarkdownInto(app, md, el, component) {
+async function renderMarkdownInto(app, md, el, component, sourcePath = "") {
 	try {
 		if (MarkdownRenderer && typeof MarkdownRenderer.render === "function") {
-			await MarkdownRenderer.render(app, md, el, "", component);
+			await MarkdownRenderer.render(app, md, el, sourcePath, component);
 		} else if (MarkdownRenderer && typeof MarkdownRenderer.renderMarkdown === "function") {
-			await MarkdownRenderer.renderMarkdown(md, el, "", component);
+			await MarkdownRenderer.renderMarkdown(md, el, sourcePath, component);
 		} else {
 			el.setText(md);
 		}

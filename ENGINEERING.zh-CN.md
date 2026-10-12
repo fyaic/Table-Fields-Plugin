@@ -37,7 +37,8 @@ Markdown 笔记是**唯一真源**。没有任何东西存在笔记之外——�
 ## 各功能如何实现
 
 ### 配置 = 相邻的 HTML 注释
-每张智能表由紧贴其上方的 `<!-- table-fields id="…" v="1" cols: … -->` 注释声明。`findSmartTables()`
+每张智能表由其上方的 `<!-- table-fields id="…" v="1" cols: … -->` 注释声明，注释和表格之间空一行
+（紧跟在注释后面的表格 Obsidian 不会渲染；标记表格命令会插入这一空行）。`findSmartTables()`
 扫全文找这些注释，把每个注释和它下方的表格配对（跳过空行），记录注释行区间、表头行、最后一行数据。
 `parseConfigBlock()` 把注释体解析成 `{ id, version, cols[] }`。**没有**注释的表格永不被接管。
 
@@ -51,7 +52,8 @@ Obsidian 用自己的 CM6 扩展渲染实时预览里的表格，后处理器够
 （一个 `StateField`）计算 `DecorationSet`：
 
 - 对每张"光标不在其源码范围内"的表格，加一个**块级** `Decoration.replace({ widget, block: true })`，
-  覆盖配置注释 + 表格行，渲染一个 `SmartTableWidget`（我们自己的可交互 `<table>`）。
+  只覆盖表格行（表头到最后一行），渲染一个 `SmartTableWidget`（我们自己的可交互 `<table>`）。
+  上方的配置注释保持可见、可编辑。
 - 当选区与某表范围相交，就**跳过**该表 → Obsidian 显示原始源码，让用户直接编辑。这就是刻意设计的
   "空闲时给控件、编辑时给源码"。
 - `editorLivePreviewField` 在源码模式下整体关闭它。

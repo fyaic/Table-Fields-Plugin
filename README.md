@@ -25,7 +25,8 @@ file, no lock-in.
 
 ## A tiny comment gives each column its field type
 
-You write (or generate) a small note like this:
+You write (or generate) a small note like this. Leave one empty line between the comment and the
+table, otherwise Obsidian does not render the table:
 
 ```markdown
 <!-- table-fields id="tasks" v="1"
@@ -35,6 +36,7 @@ cols:
   - {name: "Due",    type: "date"}
   - {name: "Done",   type: "checkbox"}
 -->
+
 | Task           | Status | Due        | Done |
 | -------------- | ------ | ---------- | ---- |
 | Draft PRD      | Doing  | 2026-07-22 | [x]  |

@@ -22,7 +22,7 @@ Table Fields 给每一**列一个含义**。告诉它"这列是复选框""这列
 
 ## 一小段注释就能给每列声明字段类型
 
-你写（或让它生成）这样一小段笔记：
+你写（或让它生成）这样一小段笔记。注释和表格之间要空一行，否则 Obsidian 不会把它渲染成表格：
 
 ```markdown
 <!-- table-fields id="tasks" v="1"
@@ -32,6 +32,7 @@ cols:
   - {name: "Due",    type: "date"}
   - {name: "Done",   type: "checkbox"}
 -->
+
 | Task           | Status | Due        | Done |
 | -------------- | ------ | ---------- | ---- |
 | Draft PRD      | Doing  | 2026-07-22 | [x]  |

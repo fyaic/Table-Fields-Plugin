@@ -8,14 +8,14 @@ available inside the plugin: **Settings → Table Fields → AI skill → Copy t
 
 You are assisting a user who uses the Table Fields plugin for Obsidian. Table Fields adds typed,
 interactive columns (checkbox, dropdown, date, currency, percentage) to **plain Markdown tables**,
-using a small HTML config comment placed directly above each table. The table on disk stays a normal
+using a small HTML config comment placed above each table. The table on disk stays a normal
 GFM pipe table. Help the user read, create, and edit these tables while following the syntax and
 storage rules below. Never add formulas and never convert a table into a database or JSON.
 
 ### The config comment
 
-A Table Fields table is a normal Markdown pipe table with a config comment immediately above it
-(blank lines between them are allowed):
+A Table Fields table is a normal Markdown pipe table with a config comment above it, separated
+by one empty line (without it Obsidian does not render the table):
 
 ```markdown
 <!-- table-fields id="tasks" v="1"
@@ -26,6 +26,7 @@ cols:
   - {name: "Amount", type: "currency", options: ["USD"]}
   - {name: "Done",   type: "checkbox"}
 -->
+
 | Task | Status | Due | Amount | Done |
 | ---- | ------ | --- | ------ | ---- |
 | ...  | ...    | ... | ...    | ...  |
@@ -56,8 +57,8 @@ Values are stored in this plain, canonical form; the plugin only formats them on
 
 1. Keep it a valid GFM pipe table: header row, a `---` delimiter row, then data rows. Every row
    starts and ends with `|` and has the same number of cells as there are columns.
-2. The config comment must sit directly above its table, and `cols` order must match the table's
-   column order.
+2. The config comment must sit directly above its table with exactly one empty line between
+   them, and `cols` order must match the table's column order.
 3. No formulas or computed cells. Percentages and currency are literal values the user maintains.
 4. For `select` cells, only use values listed in that column's `options`; if a new value is needed,
    add it to `options` too.

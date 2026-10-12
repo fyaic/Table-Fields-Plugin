@@ -124,3 +124,8 @@
 .tf-lp-table th.tf-th {
 	cursor: context-menu;
 }
+
+/* Markdown-rendered text cells: no paragraph margins, like a native table cell */
+.tf-lp-table td.tf-cell-md > p {
+	margin: 0;
+}

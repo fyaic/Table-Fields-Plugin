@@ -32,14 +32,15 @@ flowchart TD
 ```
 
 The Markdown note is the **single source of truth**. Nothing is stored outside it — configuration
-lives in an HTML comment directly above each table, and every edit is written straight back into the
+lives in an HTML comment above each table, and every edit is written straight back into the
 pipe table. Three render surfaces read the same source; only Live Preview replaces the rendering.
 
 ## How the features work
 
 ### Config as an adjacent HTML comment
-Each smart table is declared by a `<!-- table-fields id="…" v="1" cols: … -->` comment immediately
-above the pipe table. `findSmartTables()` scans the doc for these, pairs each with the table below
+Each smart table is declared by a `<!-- table-fields id="…" v="1" cols: … -->` comment above the
+pipe table, separated from it by one empty line (Obsidian does not render a table that directly
+follows the comment; the mark-table command inserts that line). `findSmartTables()` scans the doc for these, pairs each with the table below
 it (skipping blank lines), and records the comment's line span, the header line, and the last data
 row. `parseConfigBlock()` turns the comment body into `{ id, version, cols[] }`. A table with **no**
 comment is never touched.
@@ -55,8 +56,9 @@ Obsidian renders Live Preview tables with its own CM6 extension, so a post-proce
 them. Instead, `smartTableField` (a `StateField`) computes a `DecorationSet`:
 
 - For each table whose source range the cursor is **outside**, it adds a **block**
-  `Decoration.replace({ widget, block: true })` spanning the config comment + table lines, rendering
-  a `SmartTableWidget` (our own interactive `<table>`).
+  `Decoration.replace({ widget, block: true })` spanning the table lines only (header to last row),
+  rendering a `SmartTableWidget` (our own interactive `<table>`). The config comment above stays
+  visible and editable.
 - When the selection intersects a table's range, that table is **skipped** → Obsidian shows raw
   source so the user can edit it directly. This is the deliberate "controls when idle, source when
   editing" behavior.
